@@ -191,7 +191,7 @@ func permitted(w http.ResponseWriter, r *http.Request, anotherID int) bool {
 func markFootprint(w http.ResponseWriter, r *http.Request, id int) {
 	user := getCurrentUser(w, r)
 	if user.ID != id {
-		_, err := db.Exec(`INSERT INTO footprints (user_id,owner_id) VALUES (?,?)`, id, user.ID)
+		_, err := db.Exec(`REPLACE INTO footprints (user_id, owner_id, date) VALUES (?, ?, NOW())`, id, user.ID)
 		checkErr(err)
 	}
 }
@@ -414,11 +414,11 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
+	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, date AS updated
 FROM footprints
+FORCE INDEX(user_id)
 WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
-ORDER BY updated DESC
+ORDER BY id DESC
 LIMIT 10`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
@@ -652,11 +652,11 @@ func GetFootprints(w http.ResponseWriter, r *http.Request) {
 
 	user := getCurrentUser(w, r)
 	footprints := make([]Footprint, 0, 50)
-	rows, err := db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) as updated
+	rows, err := db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, date AS updated
 FROM footprints
+FORCE INDEX(user_id)
 WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
-ORDER BY updated DESC
+ORDER BY id DESC
 LIMIT 50`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
