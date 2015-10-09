@@ -403,12 +403,7 @@ LIMIT 10`, user.ID)
 		var id, one, another int
 		var createdAt time.Time
 		checkErr(rows.Scan(&id, &one, &another, &createdAt))
-		var friendID int
-		if one == user.ID {
-			friendID = another
-		} else {
-			friendID = one
-		}
+		friendID := another
 		if _, ok := friendsMap[friendID]; !ok {
 			friendsMap[friendID] = createdAt
 		}
@@ -689,12 +684,7 @@ func GetFriends(w http.ResponseWriter, r *http.Request) {
 		var id, one, another int
 		var createdAt time.Time
 		checkErr(rows.Scan(&id, &one, &another, &createdAt))
-		var friendID int
-		if one == user.ID {
-			friendID = another
-		} else {
-			friendID = one
-		}
+		friendID := another
 		if _, ok := friendsMap[friendID]; !ok {
 			friendsMap[friendID] = createdAt
 		}
