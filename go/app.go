@@ -21,6 +21,8 @@ import (
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+
+	_ "github.com/walf443/go-sql-tracer"
 )
 
 var (
@@ -725,6 +727,7 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 
 // グローバル変数にしておく
 var sport = flag.Uint("port", 0, "port to listen")
+var trace = flag.Bool("trace", false, "sql trace")
 
 func init() {
 	flag.Parse()
@@ -757,7 +760,11 @@ func main() {
 		ssecret = "beermoris"
 	}
 
-	db, err = sql.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	if *trace {
+		db, err = sql.Open("mysql-trace", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	} else {
+		db, err = sql.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	}
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
