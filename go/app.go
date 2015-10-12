@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
+	"fmt"
 	"html/template"
 	"log"
 	"net"
@@ -355,7 +356,22 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000`)
+	friendIDs := make([]string, 0, 200)
+	rows, err = db.Query(`SELECT another FROM relations WHERE one = ?`, user.ID)
+	if err != sql.ErrNoRows {
+		checkErr(err)
+	}
+	for rows.Next() {
+		var another int
+		checkErr(rows.Scan(&another))
+		friendIDs = append(friendIDs, strconv.Itoa(another))
+	}
+
+	rows, err = db.Query(fmt.Sprintf(`SELECT e.id AS id, e.user_id AS user_id, e.private AS private,
+e.body AS body, e.created_at AS created_at
+FROM entries AS e
+WHERE user_id IN (%s)
+ORDER BY created_at DESC LIMIT 10`, strings.Join(friendIDs, ",")))
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
@@ -365,13 +381,7 @@ LIMIT 10`, user.ID)
 		var body string
 		var createdAt time.Time
 		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		if !isFriend(w, r, userID) {
-			continue
-		}
 		entriesOfFriends = append(entriesOfFriends, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
-		if len(entriesOfFriends) >= 10 {
-			break
-		}
 	}
 	rows.Close()
 
