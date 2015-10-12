@@ -3,14 +3,18 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"flag"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -719,6 +723,13 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	db.Exec("DELETE FROM comments WHERE id > 1500000")
 }
 
+// グローバル変数にしておく
+var sport = flag.Uint("port", 0, "port to listen")
+
+func init() {
+	flag.Parse()
+}
+
 func main() {
 	host := os.Getenv("ISUCON5_DB_HOST")
 	if host == "" {
@@ -780,7 +791,37 @@ func main() {
 	r.HandleFunc("/initialize", myHandler(GetInitialize))
 	r.HandleFunc("/", myHandler(GetIndex))
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("../static")))
-	log.Fatal(http.ListenAndServe(":8080", r))
+
+	sigchan := make(chan os.Signal)
+	signal.Notify(sigchan, syscall.SIGTERM)
+	signal.Notify(sigchan, syscall.SIGINT)
+
+	var li net.Listener
+	sock := "/dev/shm/server.sock"
+	if *sport == 0 {
+		ferr := os.Remove(sock)
+		if ferr != nil {
+			if !os.IsNotExist(ferr) {
+				panic(ferr.Error())
+			}
+		}
+		li, err = net.Listen("unix", sock)
+		cerr := os.Chmod(sock, 0666)
+		if cerr != nil {
+			panic(cerr.Error())
+		}
+	} else {
+		li, err = net.ListenTCP("tcp", &net.TCPAddr{Port: int(*sport)})
+	}
+	if err != nil {
+		panic(err.Error())
+	}
+	go func() {
+		// func Serve(l net.Listener, handler Handler) error
+		log.Println(http.Serve(li, r))
+	}()
+
+	<-sigchan
 }
 
 func checkErr(err error) {
