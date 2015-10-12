@@ -323,7 +323,7 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 		checkErr(err)
 	}
 
-	rows, err := db.Query(`SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5`, user.ID)
+	rows, err := db.Query(`SELECT * FROM entries WHERE user_id = ? ORDER BY id LIMIT 5`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
@@ -343,7 +343,7 @@ FROM comments c
 JOIN entries e ON c.entry_id = e.id
 JOIN users u ON u.id = c.user_id
 WHERE e.user_id = ?
-ORDER BY c.created_at DESC
+ORDER BY c.id DESC
 LIMIT 10`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
@@ -370,8 +370,8 @@ LIMIT 10`, user.ID)
 	rows, err = db.Query(fmt.Sprintf(`SELECT e.id AS id, e.user_id AS user_id, e.private AS private,
 e.body AS body, e.created_at AS created_at
 FROM entries AS e
-WHERE user_id IN (%s)
-ORDER BY created_at DESC LIMIT 10`, strings.Join(friendIDs, ",")))
+WHERE e.user_id IN (%s)
+ORDER BY e.id DESC LIMIT 10`, strings.Join(friendIDs, ",")))
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
@@ -467,9 +467,9 @@ func GetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	var query string
 	if permitted(w, r, owner.ID) {
-		query = `SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5`
+		query = `SELECT * FROM entries WHERE user_id = ? ORDER BY id LIMIT 5`
 	} else {
-		query = `SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5`
+		query = `SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY id LIMIT 5`
 	}
 	rows, err := db.Query(query, owner.ID)
 	if err != sql.ErrNoRows {
@@ -530,9 +530,9 @@ func ListEntries(w http.ResponseWriter, r *http.Request) {
 	owner := getUserFromAccount(w, account)
 	var query string
 	if permitted(w, r, owner.ID) {
-		query = `SELECT * FROM entries WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`
+		query = `SELECT * FROM entries WHERE user_id = ? ORDER BY id DESC LIMIT 20`
 	} else {
-		query = `SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at DESC LIMIT 20`
+		query = `SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY id DESC LIMIT 20`
 	}
 	rows, err := db.Query(query, owner.ID)
 	if err != sql.ErrNoRows {
