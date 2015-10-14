@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -90,6 +91,34 @@ var (
 	ErrContentNotFound  = errors.New("Content not found.")
 )
 
+type cacheSlice struct {
+	sync.RWMutex
+	items map[int]interface{}
+}
+
+func NewCacheSlice() *cacheSlice {
+	m := make(map[int]interface{})
+	c := &cacheSlice{
+		items: m,
+	}
+	return c
+}
+
+func (c *cacheSlice) Set(key int, value interface{}) {
+	c.Lock()
+	c.items[key] = value
+	c.Unlock()
+}
+
+func (c *cacheSlice) Get(key int) (interface{}, bool) {
+	c.RLock()
+	v, found := c.items[key]
+	c.RUnlock()
+	return v, found
+}
+
+var uCache = NewCacheSlice()
+
 func authenticate(w http.ResponseWriter, r *http.Request, email, passwd string) {
 	query := `SELECT u.id AS id, u.account_name AS account_name, u.nick_name AS nick_name, u.email AS email
 FROM users u
@@ -140,15 +169,9 @@ func authenticated(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-func getUser(w http.ResponseWriter, userID int) *User {
-	row := db.QueryRow(`SELECT * FROM users WHERE id = ?`, userID)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email, new(string))
-	if err == sql.ErrNoRows {
-		checkErr(ErrContentNotFound)
-	}
-	checkErr(err)
-	return &user
+func getUser(userID int) *User {
+	u, _ := uCache.Get(userID)
+	return u.(*User)
 }
 
 func getUserFromAccount(w http.ResponseWriter, name string) *User {
@@ -252,7 +275,7 @@ func getTemplatePath(file string) string {
 func render(w http.ResponseWriter, r *http.Request, status int, file string, data interface{}) {
 	fmap := template.FuncMap{
 		"getUser": func(id int) *User {
-			return getUser(w, id)
+			return getUser(id)
 		},
 		"getCurrentUser": func() *User {
 			return getCurrentUser(w, r)
@@ -337,8 +360,7 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at,
-u.account_name AS account_name, u.nick_name AS nick_name
+	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at,u.account_name AS account_name, u.nick_name AS nick_name
 FROM comments c
 JOIN entries e ON c.entry_id = e.id
 JOIN users u ON u.id = c.user_id
@@ -573,7 +595,7 @@ func GetEntry(w http.ResponseWriter, r *http.Request) {
 	}
 	checkErr(err)
 	entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
-	owner := getUser(w, entry.UserID)
+	owner := getUser(entry.UserID)
 	if entry.Private {
 		if !permitted(w, r, owner.ID) {
 			checkErr(ErrPermissionDenied)
@@ -639,7 +661,7 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	checkErr(err)
 
 	entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
-	owner := getUser(w, entry.UserID)
+	owner := getUser(entry.UserID)
 	if entry.Private {
 		if !permitted(w, r, owner.ID) {
 			checkErr(ErrPermissionDenied)
@@ -770,6 +792,19 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
 	defer db.Close()
+
+	rows, err := db.Query(`SELECT id, account_name, nick_name, email FROM users`)
+	if err != sql.ErrNoRows {
+		checkErr(err)
+	}
+
+	for rows.Next() {
+		var id int
+		var accountName, nickName, email string
+		checkErr(rows.Scan(&id, &accountName, &nickName, &email))
+		uCache.Set(id, &User{id, accountName, nickName, email})
+	}
+	rows.Close()
 
 	store = sessions.NewCookieStore([]byte(ssecret))
 
