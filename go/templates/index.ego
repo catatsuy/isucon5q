@@ -1,0 +1,105 @@
+<%! func MyTmpl(w io.Writer, e TemplateExec) error %>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html" charset="utf-8">
+    <link rel="stylesheet" href="/css/bootstrap.min.css">
+    <title>ISUxi</title>
+</head>
+
+<body class="container">
+<h1 class="jumbotron"><a href="/">ISUxiへようこそ!</a></h1>
+<h2>ISUxi index</h2>
+<div class="row panel panel-primary" id="prof">
+  <div class="col-md-12 panel-title" id="prof-nickname"><%= e.User.NickName %></div>
+  <div class="col-md-12"><a href="/profile/<%= e.User.AccountName %>">プロフィール</a></div>
+  <div class="col-md-4">
+    <dl>
+      <dt>アカウント名</dt><dd id="prof-account-name"><%= e.User.AccountName %></dd>
+      <dt>メールアドレス</dt><dd id="prof-email"><%= e.User.Email %></dd>
+      <dt>姓</dt><dd id="prof-last-name"><% if e.Profile.LastName != "" { %><%= e.Profile.LastName %><% } else { %>未入力<% } %></dd>
+      <dt>名</dt><dd id="prof-first-name"><% if e.Profile.FirstName != "" { %><%= e.Profile.FirstName %><% } else { %>未入力<% } %></dd>
+      <dt>性別</dt><dd id="prof-sex"><% if e.Profile.Sex != "" { %><%= e.Profile.Sex %><% } else { %>未入力<% } %></dd>
+      <dt>誕生日</dt><dd id="prof-birthday"><% if e.Profile.Birthday.Valid { %><%= e.Profile.Birthday.Time.Format("1月2日") %><% } else { %>未入力<% } %></dd>
+      <dt>住んでいる県</dt><dd id="prof-pref"><% if e.Profile.Pref != "" { %><%= e.Profile.Pref %><% } else { %>未入力<% } %></dd>
+      <dt>友だちの人数</dt><dd id="prof-friends"><a href="/friends"><%= len(e.Friends) %>人</a></dd>
+    </dl>
+  </div>
+
+  <div class="col-md-4">
+    <div id="entries-title"><a href="/diary/entries/<%= e.User.AccountName %>">あなたの日記エントリ</a></div>
+    <div id="entries">
+      <ul class="list-group">
+        <% for _, entry := range e.Entries { %>
+        <li class="list-group-item entries-entry"><a href="/diary/entry/<%= entry.ID %>"><%= entry.Title %></a></li>
+        <% } %>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div><a href="/footprints">あなたのページへの足あと</a></div>
+    <div id="footprints">
+      <ul class="list-group">
+        <% for _, f := range e.Footprints { %>
+        <% owner := getUser(f.OwnerID) %>
+        <li class="list-group-item footprints-footprint"><%= f.CreatedAt.Format("2006-01-02 15:04:05") %>: <a href="/profile/<%= owner.AccountName %>"><%= owner.NickName %>さん</a></li>
+        <% } %>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="row panel panel-primary">
+  <div class="col-md-4">
+    <div>あなたへのコメント</div>
+    <div id="comments">
+      <% for _, c := range e.CommentsForMe { %>
+      <div class="comments-comment">
+        <ul class="list-group">
+          <% commentUser := getUser(c.UserID) %>
+          <li class="list-group-item comment-owner"><a href="/profile/<%= commentUser.AccountName%>"><%= commentUser.NickName %>さん</a>:</li>
+          <li class="list-group-item comment-comment"><% if len(c.Comment) >= 30 { %><%= c.Comment[:27] %>...<% } else { %><%= c.Comment %><% } %></li>
+          <li class="list-group-item comment-created-at">投稿時刻:<%= c.CreatedAt.Format("2006-01-02 15:04:05") %></li>
+        </ul>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div>あなたの友だちの日記エントリ</div>
+    <div id="friend-entries">
+      <% for _, ef := range e.EntriesOfFriends { %>
+      <div class="friend-entry">
+        <ul class="list-group">
+          <% entryOwner := getUser(ef.UserID) %>
+          <li class="list-group-item entry-owner"><a href="/diary/entries/<%= entryOwner.AccountName %>"><%= entryOwner.NickName %>さん</a>:</li>
+          <li class="list-group-item entry-title"><a href="/diary/entry/<%= ef.ID %>"><%= ef.Title %></a></li>
+          <li class="list-group-item entry-created-at">投稿時刻:<%= ef.CreatedAt.Format("2006-01-02 15:04:05") %></li>
+        </ul>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div>あなたの友だちのコメント</div>
+    <div id="friend-comments">
+      <% for _, c := range e.CommentsOfFriends { %>
+      <div class="friend-comment">
+        <ul class="list-group">
+          <% commentOwner := getUser(c.UserID) %>
+          <% entryOwner := getUser(c.EntryOwnerID) %>
+          <li class="list-group-item comment-from-to"><a href="/profile/<%= commentOwner.AccountName %>"><%= commentOwner.NickName %>さん</a>から<a href="/profile/<%= entryOwner.AccountName %>"><%= entryOwner.NickName %>さん</a>へのコメント:</li>
+          <li class="list-group-item comment-comment"><% if len(c.Comment) >= 30 { %><%= c.Comment[:27] %>...<% } else { %><%= c.Comment %><% } %></li>
+          <li class="list-group-item comment-created-at">投稿時刻:<%= c.CreatedAt.Format("2006-01-02 15:04:05") %></li>
+        </ul>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
