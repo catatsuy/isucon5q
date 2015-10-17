@@ -62,3 +62,6 @@ CREATE TABLE IF NOT EXISTS footprints (
   `owner_id` int NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8;
+
+ALTER TABLE entries ADD title VARCHAR(191) NOT NULL DEFAULT '';
+UPDATE entries SET title=SUBSTRING_INDEX(body, '\n', 1);
