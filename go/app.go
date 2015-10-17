@@ -118,7 +118,19 @@ func (c *cacheSlice) Get(key int) (interface{}, bool) {
 	return v, found
 }
 
+func (c *cacheSlice) Incr(key int, n int) {
+	c.Lock()
+	v, found := c.items[key]
+	if found {
+		c.items[key] = v.(int) + n
+	} else {
+		c.items[key] = n
+	}
+	c.Unlock()
+}
+
 var uCache = NewCacheSlice()
+var ecCache = NewCacheSlice()
 
 func authenticate(w http.ResponseWriter, r *http.Request, email, passwd string) {
 	query := `SELECT u.id AS id, u.account_name AS account_name, u.nick_name AS nick_name, u.email AS email
@@ -297,10 +309,11 @@ func render(w http.ResponseWriter, r *http.Request, status int, file string, dat
 			return Entry{id, userID, private == 1, title, "", createdAt}
 		},
 		"numComments": func(id int) int {
-			row := db.QueryRow(`SELECT COUNT(*) AS c FROM comments WHERE entry_id = ?`, id)
-			var n int
-			checkErr(row.Scan(&n))
-			return n
+			n, found := ecCache.Get(id)
+			if !found {
+				return 0
+			}
+			return n.(int)
 		},
 	}
 	tpl := template.Must(template.New(file).Funcs(fmap).ParseFiles(getTemplatePath(file), getTemplatePath("header.html")))
@@ -665,6 +678,7 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 
 	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
 	checkErr(err)
+	ecCache.Incr(entry.ID, 1)
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }
 
@@ -797,6 +811,18 @@ func main() {
 		var accountName, nickName, email string
 		checkErr(rows.Scan(&id, &accountName, &nickName, &email))
 		uCache.Set(id, &User{id, accountName, nickName, email})
+	}
+	rows.Close()
+
+	rows, err = db.Query(`SELECT entry_id, COUNT(*) AS c FROM comments GROUP BY entry_id`)
+	if err != sql.ErrNoRows {
+		checkErr(err)
+	}
+
+	for rows.Next() {
+		var entryID, c int
+		checkErr(rows.Scan(&entryID, &c))
+		ecCache.Set(entryID, c)
 	}
 	rows.Close()
 
