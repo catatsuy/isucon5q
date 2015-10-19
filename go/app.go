@@ -792,7 +792,7 @@ func main() {
 	}
 
 	if *trace {
-		db, err = sql.Open("mysql-trace", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+		db, err = sql.Open("mysql:trace", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
 	} else {
 		db, err = sql.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
 	}
