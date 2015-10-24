@@ -340,6 +340,17 @@ func GetLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
+type TemplateExec struct {
+	User              User
+	Profile           Profile
+	Entries           []Entry
+	CommentsForMe     []Comment
+	EntriesOfFriends  []Entry
+	CommentsOfFriends []Comment
+	Friends           []Friend
+	Footprints        []Footprint
+}
+
 func GetIndex(w http.ResponseWriter, r *http.Request) {
 	if !authenticated(w, r) {
 		return
@@ -467,18 +478,12 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	render(w, r, http.StatusOK, "index.html", struct {
-		User              User
-		Profile           Profile
-		Entries           []Entry
-		CommentsForMe     []Comment
-		EntriesOfFriends  []Entry
-		CommentsOfFriends []Comment
-		Friends           []Friend
-		Footprints        []Footprint
-	}{
+	w.WriteHeader(http.StatusOK)
+
+	checkErr(MyTmpl(w, TemplateExec{
 		*user, prof, entries, commentsForMe, entriesOfFriends, commentsOfFriends, friends, footprints,
-	})
+	}))
+
 }
 
 func GetProfile(w http.ResponseWriter, r *http.Request) {
@@ -764,6 +769,7 @@ func init() {
 	flag.Parse()
 }
 
+//go:generate ego -package main templates
 func main() {
 	host := os.Getenv("ISUCON5_DB_HOST")
 	if host == "" {
